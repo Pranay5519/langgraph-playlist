@@ -1,0 +1,5 @@
+outs:
+- md5: 0635cbfe5339f2386d426125e24b7cf7
+  size: 73728
+  hash: md5
+  path: chatbot.db
