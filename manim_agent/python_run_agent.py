@@ -6,9 +6,10 @@ from pathlib import Path
 from typing import TypedDict
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
-
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
+from langchain_ollama import ChatOllama
 
 load_dotenv()
 
@@ -33,11 +34,10 @@ class CodeOutput(BaseModel):
 # LLM (Gemini 2.5 Flash)
 # -----------------------------
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0
+llm = ChatOllama(
+    model="qwen3:latest",
+    temperature=0.7
 )
-
 
 # -----------------------------
 # Node 1 – generate python code
@@ -45,7 +45,11 @@ llm = ChatGoogleGenerativeAI(
 
 def code_generator_node(state: AgentState):
     scene_name = state["scene_name"]
-    prompt = f"""
+    parser = PydanticOutputParser(pydantic_object=CodeOutput)
+    prompt = ChatPromptTemplate.from_messages([
+        (
+            "system",
+            f"""
 You are a python code generator for Manim animations.
 
 STRICT RULE:
@@ -56,11 +60,20 @@ Do not add explanations.
 Do not add markdown.
 Import all necessary modules.
 
-User request:
-{state["user_query"]}
+{{format_instructions}}
 """
-    structured_llm = llm.with_structured_output(CodeOutput)
-    response = structured_llm.invoke([HumanMessage(content=prompt)])
+        ),
+        ("human", "{user_query}")
+    ])
+    prompt = prompt.partial(
+        format_instructions=parser.get_format_instructions()
+    )
+
+    chain = prompt | llm | parser   # ✅ plain ChatOllama
+
+    response = chain.invoke({
+        "user_query": state["user_query"]
+    })
 
     return {
         **state,
@@ -123,12 +136,12 @@ Return ONLY valid corrected python code.
 # helpers for runner
 # -----------------------------
 
-def save_code_to_file(code: str) -> Path:
+def save_code_to_file(code: str , state: AgentState) -> Path:
     "save code to tmp file"
     path = Path("tmp")
     path.mkdir(exist_ok=True)
 
-    file_path = path / f"{uuid.uuid4().hex}.py"
+    file_path = path / f"{state['scene_name']}.py"
     file_path.write_text(code, encoding="utf-8")
 
     return file_path
@@ -196,7 +209,7 @@ def run_manim_file(path: Path, scene_name: str):
 
 def code_runner_node(state):
     code = state["generated_code"]
-    path = save_code_to_file(code)
+    path = save_code_to_file(code , state=state)
 
     scene_name = state["scene_name"]
 
@@ -297,20 +310,20 @@ def build_graph():
     # End
     graph.add_edge("final_answer", END)
 
-    return  graph.compile()
-graph = build_graph()
-state = {
-    "user_query": "Implement NeuralNets working  using manim also keep voiceovers and better animation the ooutput video must be of atleast 50 seconds , and also make sure the elements are not overlapping each other",
-    "generated_code": "",
-    "scene_name" : "LogisticRegressionScene",
-    "execution_output": {},
-    "final_answer": "",
-    "video_path": "",
-    "retry_count": 0,
-    "max_retries": 3,
-    "error_history": []
-}
+    return  graph.compile(debug=True)
+# graph = build_graph()
+# state = {
+#     "user_query": "Implement NeuralNets working  using manim also keep voiceovers and better animation the ooutput video must be of atleast 50 seconds , and also make sure the elements are not overlapping each other",
+#     "generated_code": "",
+#     "scene_name" : "LogisticRegressionScene",
+#     "execution_output": {},
+#     "final_answer": "",
+#     "video_path": "",
+#     "retry_count": 0,
+#     "max_retries": 3,
+#     "error_history": []
+# }
 
-response = graph.invoke(state)
-print(response["scene_name"], "\n")
-print(response["generated_code"])
+# response = graph.invoke(state)
+# print(response["scene_name"], "\n")
+# print(response["generated_code"])
