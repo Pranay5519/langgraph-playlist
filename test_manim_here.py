@@ -1,51 +1,42 @@
 from manim import *
-from manim_voiceover import VoiceoverScene
-from manim_voiceover.services.gtts import GTTSService
 import numpy as np
 
-class NewtonScene(VoiceoverScene):
+class NewtonScene(Scene):
     def construct(self):
-        self.set_service(GTTSService())
-        
-        # Tree and apple
-        tree = ImageMobject("tree.png").scale(2)
-        apple = Circle(color=RED, radius=0.2).shift(UP * 3 + RIGHT * 1.5)
-        
-        # Newton under the tree
-        newton = ImageMobject("newton.png").scale(0.5).shift(DOWN * 2 + LEFT * 2)
-        
-        # Text elements
-        earth_text = Text("Earth").shift(LEFT * 4)
-        moon_text = Text("Moon").shift(RIGHT * 4)
-        
-        # Apple falling animation
-        self.play(GrowFromCenter(tree))
-        self.play(MoveAlongPath(apple, DOWN * 3 + LEFT * 1.5), run_time=2)
-        
-        # Newton's realization
-        self.play(ShowCreation(newton))
-        self.add_sound("apple_fall_sound.mp3")
-        
-        # Voiceover script
-        self.voiceover(
-            "Newton was inspired by an apple falling from a tree."
+        # 1. Title
+        title = Text('Understanding the Sigmoid Function', font_size=40)
+        # Positioned at y=+3.0
+        title.move_to(UP * 3)
+
+        # 2. Introduction text
+        intro_text = Text(
+            'The Sigmoid function, used in machine learning, maps any real number to a value between 0 and 1.',
+            font_size=28
         )
-        
-        self.play(FadeIn(earth_text))
-        self.play(FadeIn(moon_text))
-        
-        # Gravity concept
-        gravity_arrow = Arrow(earth_text.get_center(), moon_text.get_center(), color=BLUE, buff=0.5)
-        self.play(GrowArrow(gravity_arrow))
-        
-        self.voiceover(
-            "This led him to realize gravity affects all objects in the universe."
+        # Positioned relative to title with a vertical gap of 0.6 units
+        intro_text.next_to(title, DOWN, buff=0.6)
+
+        # 3. Coordinate system
+        axes = Axes(
+            x_range=[-6, 6, 1],
+            y_range=[-3, 1, 0.5],
+            axis_config={'color': WHITE}
         )
-        
-        # Final text
-        law_text = Text("Law of Universal Gravitation").to_edge(UP)
-        self.play(FadeIn(law_text))
-        
-        self.voiceover(
-            "Newton's insight revolutionized our understanding of motion and gravity."
+        # Axes are centered at (0,0) by default
+
+        # 4. Sigmoid function plot
+        sigmoid_graph = axes.plot(lambda x: 1 / (1 + np.exp(-x)), color=BLUE)
+
+        # 5. Key Annotations
+        # Following explicit coordinate requests, which overrides general stacking rule for these specific mobjects.
+        annotation1 = Text('As x approaches -∞, f(x) approaches 0', font_size=24).move_to(np.array([-5, 0, 0]))
+        annotation2 = Text('As x approaches +∞, f(x) approaches 1', font_size=24).move_to(np.array([5, 0, 0]))
+
+        # 6. Animation
+        self.play(
+            Write(title),
+            FadeIn(intro_text, shift=UP)
         )
+        self.play(Create(axes), Create(sigmoid_graph))
+        self.play(Write(annotation1), Write(annotation2))
+        self.wait(2)

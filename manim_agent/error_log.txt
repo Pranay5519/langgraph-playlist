@@ -1,0 +1,101 @@
+
+========================================
+Timestamp: 2026-02-14 14:02:45.631902
+Scene: NewtonScene
+Unknown location
+ModuleNotFoundError: No module named 'manim.mobjects'
+
+========================================
+Timestamp: 2026-02-14 14:29:50.879185
+Scene: NewtonScene
+│ e\scene.py:964 in compile_animations                                        │
+TypeError: Unexpected argument None passed to Scene.play().
+
+========================================
+Timestamp: 2026-02-14 14:31:25.949835
+Scene: NewtonScene
+│ render\commands.py:125 in render                                            │
+NameError: name 'BOTTOM' is not defined
+
+========================================
+Timestamp: 2026-02-14 14:32:06.596024
+Scene: NewtonScene
+│ render\commands.py:125 in render                                            │
+NameError: name 'TOP' is not defined
+
+========================================
+Timestamp: 2026-02-14 14:35:37.371099
+Scene: NewtonScene
+render\commands.py:125 in render
+<frozen runpy>:128: RuntimeWarning: 'manim.__main__' found in sys.modules after import of package 'manim', but prior to execution of 'manim.__main__'; this may result in unpredictable behaviour
+NameError: name 'TOP' is not defined
+
+========================================
+Timestamp: 2026-02-14 14:44:20.099311
+Scene: NewtonScene
+│ render\commands.py:125
+> 125                scene.render()
+AttributeError: 'NewtonScene' object has no attribute 'add_point_light'
+
+========================================
+Timestamp: 2026-02-14 14:52:31.272701
+Scene: NewtonScene
+│ render\commands.py:125
+> 125                scene.render()
+NameError: name 'BROWN' is not defined
+
+========================================
+Timestamp: 2026-02-14 21:05:28.557881
+Scene: NewtonScene
+c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+> 125                scene.render()
+AttributeError: 'Camera' object has no attribute 'frame'
+
+========================================
+Timestamp: 2026-02-14 21:20:32.886958
+Scene: NewtonScene
+c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim\__init__.py:6
+> 115                scene.render()
+(process:22228): GLib-GIO-WARNING **: 21:20:32.756: Unexpectedly, UWP app `Microsoft.OutlookForWindows_1.2025.319.100_x64__8wekyb3d8bbwe' (AUMId `Microsoft.OutlookForWindows_8wekyb3d8bbwe!Microsoft.OutlookforWindows') supports 4 extensions but has no verbs
+
+========================================
+Timestamp: 2026-02-17 09:46:01.157941
+Scene: NewtonScene
+c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+> 125                scene.render()
+'stroke_dash_offset'
+
+========================================
+Timestamp: 2026-02-17 10:13:54.430267
+Scene: NewtonScene
+c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+> 125                scene.render()
+'number_config'
+
+========================================
+Timestamp: 2026-02-17 10:14:27.317834
+Scene: NewtonScene
+c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+> 125                scene.render()
+'number_config'
+
+========================================
+Timestamp: 2026-02-17 10:26:36.544114
+Scene: NewtonScene
+c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+SyntaxError: unterminated string literal (detected at line 31)
+
+========================================
+Timestamp: 2026-02-17 10:28:51.487659
+Scene: NewtonScene
+c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+SyntaxError: unterminated string literal (detected at line 31)
+
+========================================
+Timestamp: 2026-02-17 10:40:55.958408
+Scene: NewtonScene
+c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+> 125                scene.render()
+but 2 were given

@@ -1,0 +1,63 @@
+
+You are generating code for Manim Community Edition v0.19+.
+
+CRITICAL RULES:
+
+1. Output ONLY valid executable Python code.
+   - No markdown.
+   - No explanations.
+   - No extra text.
+   - No comments outside code.
+
+2. Scene Class:
+   - Must inherit from Scene, ThreeDScene, or VoiceoverScene.
+   - Do NOT invent custom scene base classes.
+
+3. Positioning Rules:
+   - set_x() and set_y() accept FLOAT values only.
+   - NEVER pass vectors like LEFT * 4 into set_x().
+   - Use shift(LEFT * 4) for directional movement.
+   - Use move_to(vector) for absolute positioning.
+
+4. Forbidden Objects:
+   - Do NOT use ThoughtBubble, SpeechBubble, GraphScene.
+   - Do NOT assume undocumented classes exist.
+   - If a bubble is needed, use Circle + Text.
+
+5. Color Safety:
+   - Only use safe colors:
+     RED, BLUE, GREEN, YELLOW, WHITE, BLACK, GRAY,
+     ORANGE, PURPLE, PINK.
+   - If brown is needed, use:
+     ManimColor("#8B4513")
+   - Do NOT use undocumented shades like GREEN_E, BLUE_D, GREY_A.
+
+6. Animations:
+   - Use only:
+     Create, Write, FadeIn, FadeOut,
+     Transform, ReplacementTransform,
+     MoveAlongPath, Rotate, GrowFromCenter.
+   - Use obj.animate for smooth transforms.
+
+7. Axes & Graphs:
+   - Use Axes(), not GraphScene.
+   - Axis labels must use axes.get_axis_labels().
+   - Do NOT put "label" inside axis_config.
+   - Do NOT use label_direction.
+
+8. ThreeDScene Rules:
+   - Use set_camera_orientation().
+   - Use begin_ambient_camera_rotation().
+   - Use move_camera().
+   - Do NOT use add_point_light().
+   - Avoid mixing complex 3D projection tricks with 2D UI layouts.
+
+9. Do NOT modify global config.
+   - No config.frame_width changes.
+   - No quality settings inside code.
+
+10. If unsure about a parameter or class,
+    DO NOT invent it.
+    Use a simpler documented alternative.
+
+Stability and compatibility are more important than visual complexity.
