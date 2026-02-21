@@ -1,0 +1,77 @@
+
+========================================
+Timestamp: 2026-02-17 11:38:25.613752
+Scene: LinearRegression
+C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+AttributeError: Axes object has no attribute 'grid'
+
+========================================
+Timestamp: 2026-02-17 11:38:44.396986
+Scene: LinearRegression
+C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+AttributeError: Axes object has no attribute 'x_grid_lines'
+fix: The `AttributeError: Axes object has no attribute 'grid'` occurred because the `Axes` class in Manim does not have a direct `get_grid()` method. To create a grid that aligns with the axes, you should use `self.axes.get_x_grid_lines()` and `self.axes.get_y_grid_lines()` to get the individual grid lines for each axis, and then combine them into a `VGroup`.
+
+========================================
+Timestamp: 2026-02-17 11:39:06.549828
+Scene: LinearRegression
+C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+AttributeError: Axes object has no attribute 'x_grid'
+fix: The error `AttributeError: Axes object has no attribute 'x_grid_lines'` occurred because the methods `get_x_grid_lines()` and `get_y_grid_lines()` do not exist for the `Axes` object in Manim. The correct methods to retrieve the grid lines are `get_x_grid()` and `get_y_grid()`. The code was updated to use these correct method names.
+
+========================================
+Timestamp: 2026-02-17 11:39:27.394958
+Scene: LinearRegression
+C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+AttributeError: NumberLine object has no attribute 'grid_lines'
+fix: The error "AttributeError: Axes object has no attribute 'x_grid'" occurred because the `Axes` object in Manim does not have direct methods like `get_x_grid()` or `get_y_grid()` to retrieve grid lines. Instead, grid lines are associated with the individual `Axis` objects (x-axis and y-axis) within the `Axes` object.
+
+To fix this, I changed the calls on lines 38 and 39 from:
+- `x_grid_lines = self.axes.get_x_grid()`
+- `y_grid_lines = self.axes.get_y_grid()`
+
+To the correct Manim API calls:
+- `x_grid_lines = self.axes.get_x_axis().get_grid_lines()`
+- `y_grid_lines = self.axes.get_y_axis().get_grid_lines()`
+
+This retrieves the grid lines from the x-axis and y-axis components of the `Axes` object, respectively, and then they are correctly combined into a `VGroup`.
+
+========================================
+Timestamp: 2026-02-18 10:12:35.655736
+Scene: RandomForestScene
+C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+given
+
+========================================
+Timestamp: 2026-02-18 10:16:50.191543
+Scene: RandomForestScene
+C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+associated with a value
+
+========================================
+Timestamp: 2026-02-18 10:33:25.157039
+Scene: RagScene
+C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+AttributeError: Text object has no attribute 'wrap_width'
+
+========================================
+Timestamp: 2026-02-18 10:33:37.244425
+Scene: RagScene
+C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+TypeError: Mobject.__init__() got an unexpected keyword argument 'max_width'
+fix: The error `AttributeError: Text object has no attribute 'wrap_width'` occurred because `wrap_width` is not a method of the `Text` Mobject in Manim. Instead, to control the width of a `Text` Mobject, you should pass `max_width` (or `width`) directly as an argument to its constructor. The fix replaces `.wrap_width(7.5)` with `max_width=7.5` in the `Text` constructor for `rag_def_text`.
+
+========================================
+Timestamp: 2026-02-18 10:55:10.398234
+Scene: LRScene
+C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+Code line not found
+argument 'font_size'

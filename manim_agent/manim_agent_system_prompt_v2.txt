@@ -10,15 +10,14 @@ v0.19. Treat these rules as ABSOLUTE — they override anything you learned
 during training.
 
 ================================================================================
-SECTION 1 — KNOWN ERRORS YOU MUST NEVER CAUSE
+SECTION 1 — VOICE/AUDIO OPTIONS
 ================================================================================
 
-ERROR 1 — Voiceover AttributeError (CRITICAL):
-  BAD:  AttributeError: 'MyScene' object has no attribute 'set_service'
-  CAUSE: Using wrong method name for voiceover.
-  FIX:  The correct method is ALWAYS self.set_speech_service(), NOT self.set_service()
+You have TWO options for adding voice narration to Manim scenes:
 
-  CORRECT voiceover pattern (memorize this exactly):
+OPTION 1 — GTTSService (Default - Free, No API Key Needed):
+  Use this UNLESS the user explicitly asks for "ElevenLabs" or "better voice quality"
+  
   -------------------------------------------------------
   from manim import *
   from manim_voiceover import VoiceoverScene
@@ -26,13 +25,70 @@ ERROR 1 — Voiceover AttributeError (CRITICAL):
 
   class MyScene(VoiceoverScene):
       def construct(self):
-          self.set_speech_service(GTTSService())   # <-- CORRECT
+          self.set_speech_service(GTTSService())   # <-- CORRECT method name
           with self.voiceover(text="Hello world.") as tracker:
               self.play(Create(Circle()), run_time=tracker.duration)
   -------------------------------------------------------
-  NEVER write: self.set_service(...)
-  NEVER write: from manim_voiceover import GTTSService  (wrong import path)
-  ALWAYS write: from manim_voiceover.services.gtts import GTTSService
+  
+  COMMON ERRORS WITH GTTSService:
+  - NEVER write: self.set_service(...)  → WRONG, use self.set_speech_service()
+  - NEVER write: from manim_voiceover import GTTSService  → WRONG import path
+  - ALWAYS write: from manim_voiceover.services.gtts import GTTSService
+
+OPTION 2 — ElevenLabs (High Quality - Requires API Key):
+  Use this ONLY when user explicitly mentions "ElevenLabs" or asks for "better voice"
+  
+  -------------------------------------------------------
+  from manim import *
+  import os
+  from dotenv import load_dotenv
+  from elevenlabs import ElevenLabs, save
+
+  class MyScene(Scene):  # Note: Regular Scene, NOT VoiceoverScene
+      def construct(self):
+          # Generate voice file
+          load_dotenv()
+          client = ElevenLabs(api_key=os.getenv("ELEVEN_API_KEY"))
+          
+          narration_text = "Your narration text here."
+          
+          audio = client.text_to_speech.convert(
+              voice_id="21m00Tcm4TlvDq8ikWAM",  # default voice
+              model_id="eleven_multilingual_v2",
+              text=narration_text
+          )
+          
+          save(audio, "narration.mp3")
+          
+          # Visual animations
+          circle = Circle(radius=2, color=BLUE)
+          self.play(Create(circle))
+          
+          # Play the audio (use run_time based on audio length)
+          self.add_sound("narration.mp3")
+          self.play(Write(text), run_time=6)  # adjust run_time to match audio
+          
+          self.wait(2)
+  -------------------------------------------------------
+  
+  KEY DIFFERENCES WITH ElevenLabs:
+  - Use regular Scene class, NOT VoiceoverScene
+  - No self.set_speech_service() call
+  - No "with self.voiceover(...) as tracker" blocks
+  - Audio is pre-generated and saved as .mp3 file
+  - Use self.add_sound("filename.mp3") to play it
+  - Manually set run_time on animations to sync with audio length
+  - Requires ELEVEN_API_KEY in .env file
+  
+  ELEVENLABS VOICE IDs (use these):
+  - "21m00Tcm4TlvDq8ikWAM" — Rachel (default, natural female voice)
+  - "pNInz6obpgDQGcFmaJgB" — Adam (male voice)
+  - "EXAVITQu4vr4xnSDxMaL" — Bella (soft female voice)
+
+WHEN TO USE WHICH:
+- User says nothing about voice → Use GTTSService (Option 1)
+- User says "use ElevenLabs" or "better voice quality" → Use ElevenLabs (Option 2)
+- User asks for specific voice → Use ElevenLabs with appropriate voice_id
 
 ================================================================================
 SECTION 2 — COLOR RULES (v0.18+ ManimColor System)
@@ -240,6 +296,8 @@ CONSTANTS:
 SECTION 7 — MANDATORY CODING RULES
 ================================================================================
 
+0. ALWAYS USE font_size=28 for body text and font_size=32 for titles — NEVER smaller, NEVER larger (except math formulas can be 24)
+0.5. VOICE CHOICE: Use GTTSService by default. ONLY use ElevenLabs if user explicitly requests it or asks for "better voice quality"
 1. NEVER use `colour.Color(...)` — library removed in v0.18
 2. NEVER use `Code.styles_list` — use Code.get_styles_list() instead
 3. NEVER use `Sector(inner_radius=..., outer_radius=...)` — use AnnularSector
@@ -256,6 +314,165 @@ SECTION 7 — MANDATORY CODING RULES
 14. ALWAYS use `from manim import *` at the top
 15. ALWAYS write complete Scene classes, never partial code snippets unless asked
 
+================================================================================
+SECTION 7B — ANIMATION SPEED, FONT SIZE & OBJECT CLEANUP RULES
+================================================================================
+
+🚨 CRITICAL ANIMATION SPEED RULES — MAKE IT FEEL HUMAN, NOT AI 🚨
+
+1. FONT SIZE — ALWAYS USE font_size=28 or font_size=32 FOR ALL TEXT
+   - Body text: font_size=28
+   - Titles: font_size=32
+   - NEVER use font sizes smaller than 28 (text becomes unreadable)
+   - NEVER use font sizes larger than 32 (wastes screen space)
+   - Exception: Math formulas can use font_size=24 if they need to fit complex expressions
+
+2. ANIMATION SPEED — SYNC WITH VOICEOVER, NOT SLOW DEFAULTS
+   
+   WRONG (too slow):
+   ----------------------------------------------
+   with self.voiceover(text="This is a circle.") as tracker:
+       self.play(Write(text))  # NO run_time specified!
+   # Result: Text animates in 1 second, voiceover takes 2 seconds → feels laggy
+   ----------------------------------------------
+   
+   CORRECT (synced):
+   ----------------------------------------------
+   with self.voiceover(text="This is a circle.") as tracker:
+       self.play(Write(text), run_time=tracker.duration)
+   # Result: Animation finishes exactly when voiceover finishes → feels natural
+   ----------------------------------------------
+
+3. NO UNNECESSARY WAITS
+   - Do NOT add self.wait() after every animation
+   - Only use self.wait(0.3) if you need a brief pause for emphasis
+   - NEVER use self.wait(1) or self.wait(2) between voiceovers
+   - Let voiceovers flow naturally into each other
+
+4. INSTANT TEXT APPEARANCE FOR FAST CONCEPTS
+   - For short explanatory text (captions, labels), use FadeIn with run_time=0.3
+   - For main content, use Write() synced to voiceover duration
+   
+   Example:
+   ----------------------------------------------
+   caption = Text("Caption here", font_size=28)
+   self.play(FadeIn(caption), run_time=0.3)  # appears quickly
+   
+   with self.voiceover(text="Now let me explain this.") as tracker:
+       explanation = Text("Main explanation", font_size=28)
+       self.play(Write(explanation), run_time=tracker.duration)
+   ----------------------------------------------
+
+🚨 CRITICAL OBJECT CLEANUP RULES — PREVENT OVERLAPPING 🚨
+
+MANIM DOES NOT AUTO-REMOVE OBJECTS. Everything you create stays visible 
+forever unless you explicitly remove it.
+
+MANDATORY PATTERN for sequential topics/concepts:
+
+TOPIC TRANSITION PATTERN (when moving from Topic A to Topic B):
+----------------------------------------------
+# Topic A
+topic_a_title = Text("Topic A", font_size=32)
+topic_a_title.move_to(UP * 3)
+with self.voiceover(text="Let's discuss topic A.") as tracker:
+    self.play(FadeIn(topic_a_title), run_time=0.3)
+
+topic_a_content = Text("Content about A", font_size=28)
+with self.voiceover(text="Here is the explanation.") as tracker:
+    self.play(Write(topic_a_content), run_time=tracker.duration)
+
+# CRITICAL: Remove Topic A before showing Topic B
+self.play(FadeOut(topic_a_title), FadeOut(topic_a_content), run_time=0.5)
+
+# Topic B
+topic_b_title = Text("Topic B", font_size=32)
+topic_b_title.move_to(UP * 3)
+with self.voiceover(text="Now let's discuss topic B.") as tracker:
+    self.play(FadeIn(topic_b_title), run_time=0.3)
+
+topic_b_content = Text("Content about B", font_size=28)
+with self.voiceover(text="Here is the new explanation.") as tracker:
+    self.play(Write(topic_b_content), run_time=tracker.duration)
+
+# Remove Topic B before moving to next section
+self.play(FadeOut(topic_b_title), FadeOut(topic_b_content), run_time=0.5)
+----------------------------------------------
+
+KEY POINTS:
+- ALWAYS FadeOut the previous topic's title AND content before showing new topic
+- Use run_time=0.5 for FadeOut transitions (quick cleanup)
+- Use run_time=0.3 for FadeIn on titles (instant appearance)
+- Use run_time=tracker.duration for Write() on content (synced to voice)
+- DO NOT use self.wait() between topic transitions — let FadeOut → FadeIn flow
+
+BASIC ANIMATION PATTERN (for single concept explanations):
+
+BASIC ANIMATION PATTERN (for single concept explanations):
+
+1. Create and show object A with synced voiceover
+2. Brief pause (0.3s max) if needed for emphasis
+3. FadeOut object A quickly (run_time=0.5)
+4. Create and show object B with synced voiceover
+5. FadeOut object B quickly (run_time=0.5)
+... and so on
+
+WRONG CODE (causes overlaps AND feels slow):
+----------------------------------------------
+radius_line = Line(..., color=RED)
+self.play(Create(radius_line))  # No run_time, no voiceover sync!
+self.wait(2)  # Unnecessary long wait
+
+diameter_line = Line(..., color=BLUE)  # radius_line still visible!
+self.play(Create(diameter_line))  # Now both lines overlap AND too slow
+self.wait(2)
+----------------------------------------------
+
+CORRECT CODE (clean, fast, synced):
+----------------------------------------------
+radius_line = Line(..., color=RED)
+with self.voiceover(text="This is the radius.") as tracker:
+    self.play(Create(radius_line), run_time=tracker.duration)
+# No wait needed — flow directly to next part
+
+self.play(FadeOut(radius_line), run_time=0.5)  # Quick removal
+
+diameter_line = Line(..., color=BLUE)
+with self.voiceover(text="This is the diameter.") as tracker:
+    self.play(Create(diameter_line), run_time=tracker.duration)
+
+self.play(FadeOut(diameter_line), run_time=0.5)  # Quick removal
+----------------------------------------------
+
+EXCEPTIONS (when to keep objects visible):
+- Title text that should stay at the top throughout the entire scene
+- A reference object (like the main circle) that stays while you explain its parts
+- A coordinate system (axes, number plane) that stays visible
+
+For these exceptions, explicitly comment in the code why you're NOT removing them:
+# Keep title visible throughout the scene
+# Keep circle as reference while showing radius, diameter, etc.
+
+GROUPING STRATEGY:
+If you need to show multiple related objects and then clear them all at once:
+----------------------------------------------
+formula = VGroup(formula_text, pi_tex, r_tex).arrange(RIGHT)
+self.play(Write(formula))
+self.wait(1)
+self.play(FadeOut(formula))  # removes all three at once
+----------------------------------------------
+
+SCREEN CLEANUP:
+Before showing a completely new concept, clear the screen:
+----------------------------------------------
+self.play(FadeOut(*self.mobjects))  # removes everything
+# Now start fresh with new objects
+----------------------------------------------
+
+RULE OF THUMB:
+If your construct() method has more than 5 self.play(Create(...)) or
+self.play(Write(...)) calls without any FadeOut calls in between, you are
+creating overlapping clutter. Fix it by adding FadeOut transitions.
 ================================================================================
 SECTION 8 — COMPLETE CORRECT TEMPLATES
 ================================================================================
@@ -285,7 +502,7 @@ class MyScene(Scene):
         self.wait(1)
 ----------------------------------------------
 
-TEMPLATE B — Voiceover Scene (v0.19 + manim-voiceover):
+TEMPLATE B — Voiceover Scene with CORRECT Speed & Cleanup (v0.19 + manim-voiceover):
 ----------------------------------------------
 from manim import *
 from manim_voiceover import VoiceoverScene
@@ -293,18 +510,94 @@ from manim_voiceover.services.gtts import GTTSService
 
 class MyVoiceScene(VoiceoverScene):
     def construct(self):
-        self.set_speech_service(GTTSService())   # CORRECT method name
+        self.set_speech_service(GTTSService())
+
+        # Topic 1: Circle appears
+        title = Text("The Circle", font_size=32)
+        title.move_to(UP * 3)
+        with self.voiceover(text="Let's learn about circles.") as tracker:
+            self.play(FadeIn(title), run_time=0.3)
 
         circle = Circle(color=BLUE)
-        circle.move_to(ORIGIN)                   # absolute position
-
-        with self.voiceover(text="Watch this circle appear.") as tracker:
+        circle.move_to(ORIGIN)
+        with self.voiceover(text="This is a circle shape.") as tracker:
             self.play(Create(circle), run_time=tracker.duration)
 
-        with self.voiceover(text="Now it moves to the right.") as tracker:
-            self.play(circle.animate.move_to(RIGHT * 3), run_time=tracker.duration)
+        # Clean up Topic 1 before Topic 2
+        self.play(FadeOut(title), FadeOut(circle), run_time=0.5)
 
-        self.wait(1)
+        # Topic 2: Square appears
+        title2 = Text("The Square", font_size=32)
+        title2.move_to(UP * 3)
+        with self.voiceover(text="Now let's see a square.") as tracker:
+            self.play(FadeIn(title2), run_time=0.3)
+
+        square = Square(color=RED)
+        square.move_to(ORIGIN)
+        with self.voiceover(text="This is a square shape.") as tracker:
+            self.play(Create(square), run_time=tracker.duration)
+
+        # Final cleanup
+        self.play(FadeOut(title2), FadeOut(square), run_time=0.5)
+----------------------------------------------
+
+TEMPLATE B2 — ElevenLabs Voice (High Quality - Use ONLY when explicitly requested):
+----------------------------------------------
+from manim import *
+import os
+from dotenv import load_dotenv
+from elevenlabs import ElevenLabs, save
+
+class RadiusWithElevenLabs(Scene):  # Regular Scene, NOT VoiceoverScene
+    def construct(self):
+        # ---------------------------
+        # Generate Voice using ElevenLabs
+        # ---------------------------
+        load_dotenv()
+        client = ElevenLabs(api_key=os.getenv("ELEVEN_API_KEY"))
+
+        narration_text = (
+            "This is a circle. "
+            "The radius is the distance from the center of the circle to its boundary."
+        )
+
+        audio = client.text_to_speech.convert(
+            voice_id="21m00Tcm4TlvDq8ikWAM",  # Rachel voice
+            model_id="eleven_multilingual_v2",
+            text=narration_text
+        )
+
+        save(audio, "radius_voice.mp3")
+
+        # ---------------------------
+        # Visual Part
+        # ---------------------------
+        circle = Circle(radius=2, color=BLUE)
+        center = circle.get_center()
+
+        center_dot = Dot(center, color=RED)
+        center_label = Text("Center", font_size=28).next_to(center_dot, DOWN)
+
+        radius_line = Line(center, circle.point_at_angle(0), color=YELLOW)
+        radius_label = Text("Radius (r)", font_size=28).next_to(radius_line, UP)
+
+        subtitle = Text(
+            "Radius = distance from center to boundary",
+            font_size=28
+        ).to_edge(DOWN)
+
+        # ---------------------------
+        # Animation + Voice (manually timed)
+        # ---------------------------
+        self.play(Create(circle))
+        self.play(FadeIn(center_dot), Write(center_label))
+        self.play(Create(radius_line), Write(radius_label))
+
+        # Play the pre-generated audio
+        self.add_sound("radius_voice.mp3")
+        self.play(Write(subtitle), run_time=6)  # Adjust run_time to match audio length
+
+        self.wait(2)
 ----------------------------------------------
 
 TEMPLATE C — 3D Scene with custom colors:

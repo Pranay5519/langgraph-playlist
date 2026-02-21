@@ -99,3 +99,87 @@ Scene: NewtonScene
 c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
 > 125                scene.render()
 but 2 were given
+
+
+❌ Failed after 3 retries.
+
+Last Error:
+C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+<frozen runpy>:128: RuntimeWarning: 'manim.__main__' found in sys.modules after import of package 'manim', but prior to execution of 'manim.__main__'; this may result in unpredictable behaviour
++--------------------- Traceback (most recent call last) ---------------------+
+| C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim\cli\ |
+| render\commands.py:125 in render                                            |
+|                                                                             |
+|   122             try:                                                      |
+|   123                 with tempconfig({}):                                  |
+|   124                     scene = SceneClass()                              |
+| > 125                     scene.render()                                    |
+|   126             except Exception:                                         |
+|   127                 error_console.print_exception()                       |
+|   128                 sys.exit(1)                                           |
+|                                                                             |
+| C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim\scen |
+| e\scene.py:259 in render                                                    |
+|                                                                             |
+|    256         """                                                          |
+|    257         self.setup()                                                 |
+|    258         try:                                                         |
+| >  259             self.construct()                                         |
+|    260         except EndSceneEarlyException:                               |
+|    261             pass                                                     |
+|    262         except RerunSceneException:                                  |
+|                                                                             |
+| C:\Users\prana\Desktop\VS_CODE\Langraph\tmp\LinearRegression.py:38 in       |
+| construct                                                                   |
+|                                                                             |
+|    35                                                                       |
+|    36         # Fix: Axes object does not have a .get_grid() method.        |
+|    37         # Use get_x_axis().get_grid_lines() and get_y_axis().get_grid |
+| >  38         x_grid_lines = self.axes.get_x_axis().get_grid_lines()        |
+|    39         y_grid_lines = self.axes.get_y_axis().get_grid_lines()        |
+|    40         grid = VGroup(x_grid_lines, y_grid_lines)                     |
+|    41         grid.set_stroke(BLUE, 0.5, 0.5)                               |
+|                                                                             |
+| C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim\mobj |
+| ect\mobject.py:698 in getter                                                |
+|                                                                             |
+|    695                     stacklevel=2,                                    |
+|    696                 )                                                    |
+|    697                                                                      |
+| >  698                 return getattr(self, to_get)                         |
+|    699                                                                      |
+|    700             # Return a bound method                                  |
+|    701             return types.MethodType(getter, self)                    |
+|                                                                             |
+| C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim\mobj |
+| ect\mobject.py:723 in __getattr__                                           |
+|                                                                             |
+|    720             return types.MethodType(setter, self)                    |
+|    721                                                                      |
+|    722         # Unhandled attribute, therefore error                       |
+| >  723         raise AttributeError(f"{type(self).__name__} object has no a |
+|    724                                                                      |
+|    725     @property                                                        |
+|    726     def width(self) -> float:                                        |
++-----------------------------------------------------------------------------+
+AttributeError: NumberLine object has no attribute 'grid_lines'
+
+
+All errors encountered:
+1. C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4: User...
+2. C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4: User...
+3. C:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4: User...
+========================================
+Timestamp: 2026-02-21 14:05:55.469064
+Scene: LinearRegressionScene
+c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+> 125                scene.render()
+file: media\Tex\37d8190ca25f856b.log
+
+========================================
+Timestamp: 2026-02-21 14:12:33.585340
+Scene: LinearRegressionScene
+c:\Users\prana\Desktop\VS_CODE\Langraph\myvenv\Lib\site-packages\manim_voiceover\__init__.py:4
+> 125                scene.render()
+file: media\Tex\ceb2ed74206741f8.log

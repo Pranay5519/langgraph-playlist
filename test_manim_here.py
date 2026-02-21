@@ -1,42 +1,57 @@
 from manim import *
-import numpy as np
+import os
+from dotenv import load_dotenv
+from elevenlabs import ElevenLabs, save
 
-class NewtonScene(Scene):
+class RadiusWithVoice(Scene):
     def construct(self):
-        # 1. Title
-        title = Text('Understanding the Sigmoid Function', font_size=40)
-        # Positioned at y=+3.0
-        title.move_to(UP * 3)
 
-        # 2. Introduction text
-        intro_text = Text(
-            'The Sigmoid function, used in machine learning, maps any real number to a value between 0 and 1.',
+        # ---------------------------
+        # Generate Voice using ElevenLabs
+        # ---------------------------
+        load_dotenv()
+        client = ElevenLabs(api_key=os.getenv("ELEVEN_API_KEY"))
+
+        narration_text = (
+            "This is a circle. "
+            "The radius is the distance from the center of the circle to its boundary."
+        )
+
+        audio = client.text_to_speech.convert(
+            voice_id="21m00Tcm4TlvDq8ikWAM",
+            model_id="eleven_multilingual_v2",
+            text=narration_text
+        )
+
+        save(audio, "radius_voice.mp3")
+
+        # ---------------------------
+        # Visual Part
+        # ---------------------------
+
+        circle = Circle(radius=2, color=BLUE)
+        center = circle.get_center()
+
+        center_dot = Dot(center, color=RED)
+        center_label = Text("Center").scale(0.5).next_to(center_dot, DOWN)
+
+        radius_line = Line(center, circle.point_at_angle(0), color=YELLOW)
+        radius_label = Text("Radius (r)").scale(0.6).next_to(radius_line, UP)
+
+        subtitle = Text(
+            "Radius = distance from center to boundary",
             font_size=28
-        )
-        # Positioned relative to title with a vertical gap of 0.6 units
-        intro_text.next_to(title, DOWN, buff=0.6)
+        ).to_edge(DOWN)
 
-        # 3. Coordinate system
-        axes = Axes(
-            x_range=[-6, 6, 1],
-            y_range=[-3, 1, 0.5],
-            axis_config={'color': WHITE}
-        )
-        # Axes are centered at (0,0) by default
+        # ---------------------------
+        # Animation + Voice
+        # ---------------------------
 
-        # 4. Sigmoid function plot
-        sigmoid_graph = axes.plot(lambda x: 1 / (1 + np.exp(-x)), color=BLUE)
+        self.play(Create(circle))
+        self.play(FadeIn(center_dot), Write(center_label))
+        self.play(Create(radius_line), Write(radius_label))
 
-        # 5. Key Annotations
-        # Following explicit coordinate requests, which overrides general stacking rule for these specific mobjects.
-        annotation1 = Text('As x approaches -∞, f(x) approaches 0', font_size=24).move_to(np.array([-5, 0, 0]))
-        annotation2 = Text('As x approaches +∞, f(x) approaches 1', font_size=24).move_to(np.array([5, 0, 0]))
+        self.add_sound("radius_voice.mp3")
+        self.play(Write(subtitle), run_time=6)
 
-        # 6. Animation
-        self.play(
-            Write(title),
-            FadeIn(intro_text, shift=UP)
-        )
-        self.play(Create(axes), Create(sigmoid_graph))
-        self.play(Write(annotation1), Write(annotation2))
         self.wait(2)
