@@ -372,7 +372,7 @@ def save_error_log(state: dict, run_output: dict):
         f.write(f"{code_line}\n")
         f.write(f"{final_error_line}\n")
 
-        # ✅ Append LLM explanation if available
+        # Append LLM explanation if available
         if fix_explanation:
             f.write(f"fix: {fix_explanation.strip()}\n")
 
@@ -401,7 +401,7 @@ def run_manim_file(path: Path, scene_name: str, state: AgentState):
         if result.returncode == 0:
             video_path = find_generated_mp4()
         else:
-            # 🔥 Save error log automatically
+            #  Save error log automatically
             save_error_log(state, {
                 "stderr": result.stderr,
                 "returncode": result.returncode
@@ -469,7 +469,7 @@ def should_retry(state: AgentState) -> str:
     
     # Failed but can retry
     if state["retry_count"] < state["max_retries"]:
-        print(f"\n⚠️  Error detected. Retry {state['retry_count'] + 1}/{state['max_retries']}")
+        print(f"\nError detected. Retry {state['retry_count'] + 1}/{state['max_retries']}")
         return "code_fixer"
     
     # Failed and out of retries
@@ -483,7 +483,7 @@ def final_answer_node(state: AgentState):
     out = state["execution_output"]
 
     if out["returncode"] != 0:
-        answer = f"""❌ Failed after {state['retry_count']} retries.
+        answer = f""" Failed after {state['retry_count']} retries.
 
 Last Error:
 {out['stderr']}
@@ -492,7 +492,7 @@ All errors encountered:
 {chr(10).join(f"{i+1}. {err[:100]}..." for i, err in enumerate(state["error_history"]))}
 """
     else:
-        answer = f"""✅ Animation generated successfully after {state['retry_count']} retries!
+        answer = f""" Animation generated successfully after {state['retry_count']} retries!
 
 Video: {state['video_path']}
 
