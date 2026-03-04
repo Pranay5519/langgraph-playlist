@@ -12,6 +12,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 from langchain_ollama import ChatOllama
+from langchain_groq import ChatGroq
 from typing import Optional
 load_dotenv()
 
@@ -43,9 +44,10 @@ class ExpandedPrompt(BaseModel):
 # LLM (Gemini 2.5 Flash)
 # -----------------------------
 
-llm = ChatOllama(
-    model="deepseek-r1:8b",
-    temperature=0.7
+llm = llm = ChatGroq(
+    temperature=0,
+    model_name="qwen/qwen3-32b",
+    max_tokens=10000
 )
 google_llm = ChatGoogleGenerativeAI(model = 'gemini-2.5-flash')
 
@@ -188,7 +190,7 @@ def prompt_expander_node(state: AgentState) -> dict:
         format_instructions=parser.get_format_instructions()
     )
 
-    chain = prompt | llm | parser
+    chain = prompt | google_llm | parser
 
     response = chain.invoke({
         "user_query": user_query
@@ -232,7 +234,7 @@ STRICT RULES:
 User request:
 {state["user_query"]}
 """
-    structured_llm = google_llm.with_structured_output(CodeOutput)
+    structured_llm = llm.with_structured_output(CodeOutput)
     response = structured_llm.invoke([HumanMessage(content=prompt)])
 
     return {
@@ -278,7 +280,7 @@ Fix the code by:
 Return ONLY valid corrected python code.
 """
 
-        structured_llm = google_llm.with_structured_output(CodeOutput)
+        structured_llm = llm.with_structured_output(CodeOutput)
         response = structured_llm.invoke(prompt)
 
         new_error_history = state["error_history"] + [last_error]
