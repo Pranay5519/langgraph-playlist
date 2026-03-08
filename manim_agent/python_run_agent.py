@@ -1,6 +1,7 @@
 import sys
 import subprocess
 import uuid
+from langsmith import traceable
 import re
 from pathlib import Path
 from typing import TypedDict
@@ -44,9 +45,9 @@ class ExpandedPrompt(BaseModel):
 # LLM (Gemini 2.5 Flash)
 # -----------------------------
 
-llm = llm = ChatGroq(
+groq_coding_llm = llm = ChatGroq(
     temperature=0,
-    model_name="qwen/qwen3-32b",
+    model_name="openai/gpt-oss-20b",
     max_tokens=10000
 )
 google_llm = ChatGoogleGenerativeAI(model = 'gemini-2.5-flash')
@@ -211,7 +212,7 @@ def load_system_prompt() -> str:
     with open(prompt_path, "r", encoding="utf-8") as f:
         return f.read()
     
-
+@traceable
 def code_generator_node(state: AgentState):
     scene_name = state["scene_name"]
     system_prompt = load_system_prompt()
@@ -234,7 +235,7 @@ STRICT RULES:
 User request:
 {state["user_query"]}
 """
-    structured_llm = llm.with_structured_output(CodeOutput)
+    structured_llm = google_llm.with_structured_output(CodeOutput)
     response = structured_llm.invoke([HumanMessage(content=prompt)])
 
     return {
@@ -280,7 +281,7 @@ Fix the code by:
 Return ONLY valid corrected python code.
 """
 
-        structured_llm = llm.with_structured_output(CodeOutput)
+        structured_llm = google_llm.with_structured_output(CodeOutput)
         response = structured_llm.invoke(prompt)
 
         new_error_history = state["error_history"] + [last_error]
@@ -518,10 +519,10 @@ def build_graph():
     graph.add_node("final_answer", final_answer_node)
 
     # Set entry point
-    graph.set_entry_point("prompt_expander")
+    graph.set_entry_point("code_generator")
 
     # Initial generation flow
-    graph.add_edge("prompt_expander", "code_generator")
+   # graph.add_edge("prompt_expander", "code_generator")
     graph.add_edge("code_generator", "code_runner")
 
     # Conditional: retry or finish
