@@ -13,7 +13,19 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.retrievers import BM25Retriever
+from langchain_core.prompts import PromptTemplate
+from langsmith import traceable
+from langchain_google_genai import GoogleGenerativeAIEmbeddings , ChatGoogleGenerativeAI
+from langchain_classic.retrievers.multi_query import MultiQueryRetriever
+from dotenv import load_dotenv
+load_dotenv()
 
+from pydantic import BaseModel, Field
+from typing import List
+
+class SingleQueryOutput(BaseModel):
+    """A single optimized search query for keyword matching."""
+    query: str = Field(..., description="A single search query optimized for BM25.")
 
 # ──────────────────────────────────────────────
 # 1. Transcript Loader  (unchanged)
@@ -30,7 +42,7 @@ def load_transcript(url: str) -> str | None:
             data = [f"{item.text} ({item.start})" for item in captions]
             return " ".join(data)
         except Exception as e:
-            print(f"❌ Error fetching transcript: {e}")
+            print(f" Error fetching transcript: {e}")
             return None
 
 
@@ -48,7 +60,7 @@ def text_splitter(transcript: str):
 #    Returns a simple callable: query → list[Document]
 # ──────────────────────────────────────────────
 
-def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: int = 5):
+def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: int = 5 , doc_language :str = "English"):
     """
     Builds and returns hybrid_retrieve(query) callable.
 
@@ -59,54 +71,115 @@ def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: 
     bm25_k  : top-k docs fetched from BM25
     top_n   : final docs returned after merge
     """
+    # define Structured LLMS
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
+    bm25_structured_llm = llm.with_structured_output(SingleQueryOutput)
+    
     # ── Dense retriever (FAISS) ──────────────────────────────
     embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        model_kwargs={"device": "cpu"},
-    )
+                    model_name="intfloat/multilingual-e5-base",
+                    model_kwargs={"device": "cpu"}
+                )
+
     vector_store    = FAISS.from_documents(chunks, embeddings)
-    faiss_retriever = vector_store.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": faiss_k},
-    )
+    # faiss_retriever = vector_store.as_retriever(
+    #     search_type="similarity",
+    #     search_kwargs={"k": faiss_k},
+    # )
+
+    # Multi-Query Retrievers
+    
+    QUERY_PROMPT = PromptTemplate(
+    input_variables=["question", "language"], 
+    template="""You are an AI language model assistant. 
+    Your task is to generate exactly five (5) different versions of the user question 
+    to retrieve relevant documents from a vector database. 
+    
+    STRICT RULES:
+    1. Output ONLY the questions.
+    2. One question per line.
+    3. DO NOT include any introductory text, concluding text, or explanations.
+    4. DO NOT use numbering (1, 2, 3) or bullet points.
+    5. DO NOT use bold text (**).
+    6. All generated queries MUST be in {language}.
+    
+    Original question: {question}""",
+)
+    custom_prompt = QUERY_PROMPT.partial(language = doc_language)
+    multiquery_retriever = MultiQueryRetriever.from_llm(
+                        retriever=vector_store.as_retriever(search_kwargs={"k": 1}),
+                        llm=ChatGoogleGenerativeAI(model="gemini-2.5-flash"),
+                        prompt=custom_prompt ,
+                        parser_key="lines"  # ensures that any accidental whitespace or empty lines are cleaned up before the search
+                    )
+
 
     # ── Sparse retriever (BM25) ──────────────────────────────
     bm25_retriever   = BM25Retriever.from_documents(chunks)
     bm25_retriever.k = bm25_k
-
+    
     # ── Hybrid callable ──────────────────────────────────────
+    @traceable(name="Hybrid_Retriever")
     def hybrid_retrieve(query: str):
+        @traceable(name="embeddings")
+        def dense_search(q):
+            return multiquery_retriever.invoke(q)
+        @traceable(name="BM25 Sparse Retrieval")
+        def bm25_search(q):
+            return bm25_retriever.invoke(q)
+        
+        faiss_docs = dense_search(query)
+        
+        if doc_language=='hindi':
+            BM25_HINDI_PROMPT = """
+            Rewrite the following question into a single optimized search query in Hindi.
+            
+            CRITICAL: 
+            - Use transliteration for technical terms (e.g. 'layers' -> 'लेयर्स', 'filter' -> 'फ़िल्टर').
+            - DO NOT use formal dictionary translations (e.g. avoid 'परतें').
+            - Focus on matching keywords as they are likely spoken in the video.
+            
+            Original Question: {question}
+            """
+            formatted_prompt = BM25_HINDI_PROMPT.format(question=query)
+            
+            # 3. Invoke the structured LLM and extract the string
+            hindi_query_obj: SingleQueryOutput = bm25_structured_llm.invoke(formatted_prompt)
+            bm25_docs = bm25_search(hindi_query_obj.query)
+            
+        else:
+            bm25_docs  = bm25_search(query)
 
-        faiss_docs = faiss_retriever.invoke(query)
-        bm25_docs  = bm25_retriever.invoke(query)
+        # print(f"\n{'='*60}")
+        # print(f" Query: {query}")
+        # print(f"{'='*60}")
 
-        print(f"\n{'='*60}")
-        print(f"🔍 Query: {query}")
-        print(f"{'='*60}")
+        # print(f"\n FAISS docs ({len(faiss_docs)}):")
+        # for i, doc in enumerate(faiss_docs, 1):
+        #     print(f"  [{i}] {doc.page_content[:120]}...")
 
-        print(f"\n📦 FAISS docs ({len(faiss_docs)}):")
-        for i, doc in enumerate(faiss_docs, 1):
-            print(f"  [{i}] {doc.page_content[:120]}...")
-
-        print(f"\n📦 BM25 docs ({len(bm25_docs)}):")
-        for i, doc in enumerate(bm25_docs, 1):
-            print(f"  [{i}] {doc.page_content[:120]}...")
+        # print(f"\n BM25 docs ({len(bm25_docs)}):")
+        # for i, doc in enumerate(bm25_docs, 1):
+        #     print(f"  [{i}] {doc.page_content[:120]}...")
 
         # Merge — deduplicate by content, FAISS first then BM25
-        seen   = set()
-        merged = []
-        for doc in faiss_docs + bm25_docs:
-            if doc.page_content not in seen:
-                seen.add(doc.page_content)
-                merged.append(doc)
+        @traceable(name="Hybrid Merge")
+        def merge_results(f_docs, b_docs):
+            seen = set()
+            merged = []
+            for doc in f_docs + b_docs:
+                if doc.page_content not in seen:
+                    seen.add(doc.page_content)
+                    merged.append(doc)
+            return merged[:top_n]
 
-        final = merged[:top_n]
+        final = merge_results(faiss_docs, bm25_docs)
 
-        print(f"\n✅ Final merged docs ({len(final)}):")
-        for i, doc in enumerate(final, 1):
-            print(f"  [{i}] {doc.page_content[:120]}...")
-        print(f"{'='*60}\n")
+        # print(f"\n Final merged docs ({len(final)}):")
+        # for i, doc in enumerate(final, 1):
+        #     print(f"  [{i}] {doc.page_content[:120]}...")
+        # print(f"{'='*60}\n")
 
         return final
 
@@ -117,7 +190,7 @@ def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: 
 # 4. One-shot pipeline helper
 # ──────────────────────────────────────────────
 
-def create_retriever_from_url(youtube_url: str):
+def create_retriever_from_url(youtube_url: str , doc_language):
     """URL → transcript → chunks → hybrid_retrieve callable"""
 
     print("📥 Fetching transcript …")
@@ -130,7 +203,7 @@ def create_retriever_from_url(youtube_url: str):
     chunks = text_splitter(transcript)
 
     print("🔍 Building hybrid retriever (FAISS + BM25) …")
-    retriever = build_hybrid_retriever(chunks)
+    retriever = build_hybrid_retriever(chunks , doc_language=doc_language)
 
     print("✅ Hybrid retriever ready.")
     return retriever

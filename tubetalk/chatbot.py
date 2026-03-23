@@ -8,14 +8,14 @@ Only the retriever wiring changes from your original code.
 
 import sqlite3
 from typing import TypedDict, Annotated
-
+from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.sqlite import SqliteSaver
-
-from pydantic import BaseModel
+from langsmith import traceable
+from pydantic import BaseModel , Field
 from typing import List, Optional
 
 
@@ -25,9 +25,21 @@ from typing import List, Optional
 # ──────────────────────────────────────────────
 
 class AnsandTime(BaseModel):
-    answer: List[str]
-    timestamps: Optional[List[float]] = None
-    code: Optional[str] = None
+    # Compulsory answer, strictly in English
+    answer: str = Field(
+        ..., 
+        description="The detailed answer to the user's question. MUST be written in English only."
+    )
+    # Single timestamp instead of a list
+    timestamp: Optional[float] = Field(
+        None, 
+        description="The specific start time (in seconds) where this information appears in the video."
+    )
+    # Optional code
+    code: Optional[str] = Field(
+        None, 
+        description="Any code snippets mentioned in the transcript. Leave null if no code is present."
+    )
 
 
 # ──────────────────────────────────────────────
@@ -42,7 +54,6 @@ class ChatState(TypedDict):
 # ──────────────────────────────────────────────
 # Chatbot Service
 # ──────────────────────────────────────────────
-
 class ChatbotService:
     """
     LangGraph chatbot that answers questions about a YouTube video.
@@ -67,16 +78,20 @@ class ChatbotService:
 
         # ── System prompt ───────────────────────────────────────
         self.system_message = SystemMessage(
-            content="You are the YouTuber from the video. "
-                    "Answer ONLY using the transcript context provided."
+        content=(
+            "You are the YouTuber from the video. "
+            "1. Answer ONLY using the transcript context provided. "
+            "2. Your answer must be written in ENGLISH, even if the transcript is in another language. "
+            "3. Provide exactly one relevant timestamp if available."
         )
+    )
 
         # ── Persistent memory (SQLite) ──────────────────────────
         conn = sqlite3.connect(db_path, check_same_thread=False)
         self.checkpointer = SqliteSaver(conn=conn)
 
     # ── Graph node ──────────────────────────────────────────────
-
+    @traceable(name="Chat Node")
     def _chat_node(self, state: ChatState, retriever):
         """
         Single graph node:
@@ -90,7 +105,7 @@ class ChatbotService:
 
         # Hybrid retrieval  ← only change from original
         retrieved_chunks = retriever(user_question)
-        print(retrieved_chunks)
+        #print(retrieved_chunks)
         context = "\n\n".join(doc.page_content for doc in retrieved_chunks)
 
         messages = (
@@ -104,15 +119,17 @@ class ChatbotService:
         response: AnsandTime = self.structured_model.invoke(messages)
 
         ai_text = (
-            f"{' '.join(response.answer)}\n"
-            f"Timestamp: {response.timestamps}\n"
-            f"Code: {response.code}"
+            f"Answer: {response.answer}\n"
+            f"Timestamp: {response.timestamp}s\n"
         )
+        
+        # Only add code block if it exists
+        if response.code:
+            ai_text += f"\nCode:\n```python\n{response.code}\n```"
 
         return {"messages": [AIMessage(content=ai_text)]}
 
     # ── Graph builder ────────────────────────────────────────────
-
     def build_chatbot(self, retriever):
         """
         Compile the LangGraph with the hybrid retriever baked in.
