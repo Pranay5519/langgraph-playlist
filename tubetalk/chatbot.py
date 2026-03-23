@@ -17,7 +17,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langsmith import traceable
 from pydantic import BaseModel , Field
 from typing import List, Optional
-
+from langchain_ollama import ChatOllama
 
 # ──────────────────────────────────────────────
 # Pydantic structured-output model
@@ -64,15 +64,15 @@ class ChatbotService:
     def __init__(
         self,
         api_key: str,
-        model_name: str = "gemini-2.5-flash",
+        model_name: str = "qwen3:latest",
         temperature: float = 0,
         db_path: str = "tubetalk.db",
     ):
         # ── LLM ────────────────────────────────────────────────
-        self.llm = ChatGoogleGenerativeAI(
+        self.llm = ChatOllama(
             model=model_name,
-            temperature=temperature,
-            api_key=api_key,
+            temperature=temperature
+            #api_key=api_key,
         )
         self.structured_model = self.llm.with_structured_output(AnsandTime)
 

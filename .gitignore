@@ -10,4 +10,5 @@ tmp
 
 voices
 voices_cmp
-/tubetalk.db
+tubetalk.db
+/tubetalk/faiss_indexes

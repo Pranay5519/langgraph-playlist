@@ -1,11 +1,3 @@
-"""
-retriever.py
-────────────────────────────────────────────────────────────
-Hybrid Retriever  =  FAISS (dense) + BM25 (sparse)
-No custom class. Just fetch from both, deduplicate, return.
-────────────────────────────────────────────────────────────
-"""
-
 import re
 from youtube_transcript_api import YouTubeTranscriptApi
 
@@ -15,11 +7,12 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.prompts import PromptTemplate
 from langsmith import traceable
-from langchain_google_genai import GoogleGenerativeAIEmbeddings , ChatGoogleGenerativeAI
+from langchain_google_genai import GoogleGenerativeAIEmbeddings , ChatGoogleGenerativeAI 
+from langchain_ollama import ChatOllama
 from langchain_classic.retrievers.multi_query import MultiQueryRetriever
 from dotenv import load_dotenv
 load_dotenv()
-
+import os
 from pydantic import BaseModel, Field
 from typing import List
 
@@ -60,7 +53,7 @@ def text_splitter(transcript: str):
 #    Returns a simple callable: query → list[Document]
 # ──────────────────────────────────────────────
 
-def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: int = 5 , doc_language :str = "English"):
+def build_hybrid_retriever(chunks,thread_id, *, faiss_k: int = 4, bm25_k: int = 4, top_n: int = 5 , doc_language :str = "English"):
     """
     Builds and returns hybrid_retrieve(query) callable.
 
@@ -72,7 +65,7 @@ def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: 
     top_n   : final docs returned after merge
     """
     # define Structured LLMS
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+    llm = ChatOllama(model="qwen3:latest")
 
     bm25_structured_llm = llm.with_structured_output(SingleQueryOutput)
     
@@ -82,13 +75,26 @@ def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: 
                     model_kwargs={"device": "cpu"}
                 )
 
-    vector_store    = FAISS.from_documents(chunks, embeddings)
-    # faiss_retriever = vector_store.as_retriever(
-    #     search_type="similarity",
-    #     search_kwargs={"k": faiss_k},
-    # )
+    base_dir = os.path.join("tubetalk", "faiss_indexes")
+    
+    # 2. Automatically create the folders if they are missing
+    os.makedirs(base_dir, exist_ok=True)
 
-    # Multi-Query Retrievers
+    # 3. Set the final path for this specific video
+    index_path = os.path.join(base_dir, f"faiss_index_{thread_id}")
+
+    if os.path.exists(index_path):
+        print(f"Loading existing FAISS index from: {index_path}")
+        vector_store = FAISS.load_local(
+            index_path, 
+            embeddings, 
+            allow_dangerous_deserialization=True # Necessary for local loading
+        )
+    else:
+        print("🧠 Creating new embeddings and FAISS index...")
+        vector_store = FAISS.from_documents(chunks, embeddings)
+        vector_store.save_local(index_path)
+        print(f"💾 FAISS index saved to: {index_path}")
     
     QUERY_PROMPT = PromptTemplate(
     input_variables=["question", "language"], 
@@ -109,7 +115,7 @@ def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: 
     custom_prompt = QUERY_PROMPT.partial(language = doc_language)
     multiquery_retriever = MultiQueryRetriever.from_llm(
                         retriever=vector_store.as_retriever(search_kwargs={"k": 1}),
-                        llm=ChatGoogleGenerativeAI(model="gemini-2.5-flash"),
+                        llm=ChatOllama(model="qwen3:latest"),
                         prompt=custom_prompt ,
                         parser_key="lines"  # ensures that any accidental whitespace or empty lines are cleaned up before the search
                     )
@@ -150,20 +156,7 @@ def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: 
             
         else:
             bm25_docs  = bm25_search(query)
-
-        # print(f"\n{'='*60}")
-        # print(f" Query: {query}")
-        # print(f"{'='*60}")
-
-        # print(f"\n FAISS docs ({len(faiss_docs)}):")
-        # for i, doc in enumerate(faiss_docs, 1):
-        #     print(f"  [{i}] {doc.page_content[:120]}...")
-
-        # print(f"\n BM25 docs ({len(bm25_docs)}):")
-        # for i, doc in enumerate(bm25_docs, 1):
-        #     print(f"  [{i}] {doc.page_content[:120]}...")
-
-        # Merge — deduplicate by content, FAISS first then BM25
+            
         @traceable(name="Hybrid Merge")
         def merge_results(f_docs, b_docs):
             seen = set()
@@ -175,12 +168,6 @@ def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: 
             return merged[:top_n]
 
         final = merge_results(faiss_docs, bm25_docs)
-
-        # print(f"\n Final merged docs ({len(final)}):")
-        # for i, doc in enumerate(final, 1):
-        #     print(f"  [{i}] {doc.page_content[:120]}...")
-        # print(f"{'='*60}\n")
-
         return final
 
     return hybrid_retrieve
@@ -190,7 +177,7 @@ def build_hybrid_retriever(chunks, *, faiss_k: int = 4, bm25_k: int = 4, top_n: 
 # 4. One-shot pipeline helper
 # ──────────────────────────────────────────────
 
-def create_retriever_from_url(youtube_url: str , doc_language):
+def create_retriever_from_url(youtube_url: str , doc_language,thread_id):
     """URL → transcript → chunks → hybrid_retrieve callable"""
 
     print("📥 Fetching transcript …")
@@ -203,7 +190,7 @@ def create_retriever_from_url(youtube_url: str , doc_language):
     chunks = text_splitter(transcript)
 
     print("🔍 Building hybrid retriever (FAISS + BM25) …")
-    retriever = build_hybrid_retriever(chunks , doc_language=doc_language)
+    retriever = build_hybrid_retriever(chunks,thread_id=thread_id , doc_language=doc_language)
 
     print("✅ Hybrid retriever ready.")
     return retriever
