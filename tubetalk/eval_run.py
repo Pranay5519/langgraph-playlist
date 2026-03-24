@@ -6,10 +6,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from dotenv import load_dotenv
 from langsmith import traceable
 # Import your custom modules
-from retriever import create_retriever_from_url
+from hybrid_retriever import create_retriever_from_url
+from eval_metrics import ragas_faithfulness_evaluator, ragas_context_recall_evaluator
 from chatbot import ChatbotService
-from eval_metrics import correctness
-
 load_dotenv()
 os.environ["LANGCHAIN_PROJECT"] = "TubeTalk-Production-Eval"
 # ── CONFIG ──────────────────────────────────────────────────
@@ -20,13 +19,13 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 THREAD_ID = "genai"
 
-retriever_result = create_retriever_from_url(YOUTUBE_URL, doc_language="hindi" , thread_id=THREAD_ID)
+retriever_result = create_retriever_from_url(YOUTUBE_URL, doc_language="english" , thread_id=THREAD_ID)
 if isinstance(retriever_result, tuple):
     retriever_obj = retriever_result[0]
 else:
     retriever_obj = retriever_result
 
-# Initialize the chatbot service
+# Initialize the chaStbot service
 service = ChatbotService(api_key=GOOGLE_API_KEY)
 app = service.build_chatbot(retriever_obj)
 
@@ -38,16 +37,21 @@ def predict_chatbot(inputs: dict):
     # Generate a unique thread ID for a clean state
     config = {"configurable": {"thread_id": THREAD_ID}}
 
-    # Invoke the graph to get the answer
+    # Invoke the graph to get the model's answer
     result = app.invoke(
         {"messages": [HumanMessage(content=user_q)]},
         config=config
     )
     
-    # Only return the messages; ignoring 'documents' for now
+    # Manually fetch the documents here using the global retriever object!
+    retrieved_docs = retriever_obj(user_q)
+    
+    # Return both the generated messages and the fetched documents
     return {
-        "messages": result["messages"]
+        "messages": result["messages"],
+        "documents": retrieved_docs
     }
+
 # ── RUN EVALUATION ───────────────────────────────────────────
 if __name__ == "__main__":
     print(f"Starting evaluation on dataset: {DATASET_NAME}")
@@ -56,13 +60,13 @@ if __name__ == "__main__":
         results = evaluate(
             predict_chatbot,
             data=DATASET_NAME,
-            evaluators=[correctness],
-            experiment_prefix="eval-gem-2.5-flash",
+            evaluators=[ragas_faithfulness_evaluator, ragas_context_recall_evaluator],
+            experiment_prefix="hybrid-retriever",
             metadata={
-        "model": "ollama-qwen3:latest",
-        "retriever": "hybrid-ensemble",
+        "model": "gemini-2.5-flash",
+        "retriever": "hybrid",           
         "language": "hindi",
-        "evaluator" : "ollama-qwen3:latest"
+        "evaluator" : "gemini-2.5-flash"
     }
         )
         print("Evaluation complete! View results in LangSmith.")

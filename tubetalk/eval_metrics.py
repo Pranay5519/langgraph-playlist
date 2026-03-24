@@ -1,72 +1,116 @@
-from typing import Annotated, List
-from pydantic import BaseModel, Field
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
-# ── GRADER MODELS ──────────────────────────────────────────
+from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall, answer_correctness
+from ragas.llms import LangchainLLMWrapper
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+import os
+from ragas.dataset_schema import SingleTurnSample
+# 1. Initialize your Gemini Models
+gemini_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+gemini_embeddings = GoogleGenerativeAIEmbeddings(
+    model="gemini-embedding-2-preview", 
+    google_api_key=os.getenv("GOOGLE_API_KEY")
+)
 
-class GroundedGrade(BaseModel):
-    explanation: str = Field(description="Step-by-step reasoning for the score")
-    grounded: bool = Field(description="True if the answer is ONLY based on facts, False if it hallucinates")
+# 2. Wrap them for Ragas
+ragas_llm = LangchainLLMWrapper(gemini_llm)
+ragas_embeddings = LangchainEmbeddingsWrapper(gemini_embeddings)
 
-class RetrievalRelevanceGrade(BaseModel):
-    explanation: str = Field(description="Reasoning for the relevance score")
-    relevant: bool = Field(description="True if facts are related to the question, False otherwise")
+# 3. override the default LLMs/Embeddings inside the Ragas metrics
+faithfulness.llm = ragas_llm
 
-class CorrectnessGrade(BaseModel):
-    explanation: str = Field(description="Reasoning for comparing prediction to reference")
-    correct: bool = Field(description="True if the prediction matches the reference answer's meaning")
+answer_relevancy.llm = ragas_llm
+answer_relevancy.embeddings = ragas_embeddings
 
-# ── INITIALIZE GRADER LLM ──────────────────────────────────
-# Using Gemini 2.5 Flash as the "Judge"
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+context_precision.llm = ragas_llm
+context_recall.llm = ragas_llm
 
 
-# ── EVALUATOR FUNCTIONS ────────────────────────────────────
 
-def groundedness(inputs: dict, outputs: dict) -> bool:
-    """Checks if the answer is based ONLY on the retrieved documents (Hallucination check)."""
-    grader = llm.with_structured_output(GroundedGrade)
-    
-    # Extract docs and answer from the chatbot output
-    doc_string = "\n\n".join(doc.page_content for doc in outputs["documents"])
+def ragas_faithfulness_evaluator(inputs: dict, outputs: dict, reference_outputs: dict | None = None) -> dict:
+    question = inputs["question"]
     answer = outputs["messages"][-1].content
+    contexts = [doc.page_content for doc in outputs["documents"]]
     
-    prompt = f"FACTS: {doc_string}\n\nSTUDENT ANSWER: {answer}"
+    # Create a SingleTurnSample object
+    sample = SingleTurnSample(
+        user_input=question,
+        response=answer,
+        retrieved_contexts=contexts
+    )
     
-    result = grader.invoke([
-        SystemMessage(content="Determine if the answer is grounded in the facts provided. No outside info."),
-        HumanMessage(content=prompt)
-    ])
-    return result.grounded
+    # Use single_turn_score instead of score_single
+    score = faithfulness.single_turn_score(sample)
+    
+    return {"key": "ragas_faithfulness", "score": score}
 
-def retrieval_relevance(inputs: dict, outputs: dict) -> bool:
-    """Checks if the retrieved chunks a I re actually related to the user's question."""
-    grader = llm.with_structured_output(RetrievalRelevanceGrade)
-    
-    doc_string = "\n\n".join(doc.page_content for doc in outputs["documents"])
-    prompt = f"QUESTION: {inputs['question']}\n\nFACTS: {doc_string}"
-    
-    result = grader.invoke([
-        SystemMessage(content="Determine if the retrieved facts are relevant to the question."),
-        HumanMessage(content=prompt)
-    ])
-    return result.relevant
 
-def correctness(inputs: dict, outputs: dict, reference_outputs: dict) -> bool:
-    """Checks if the chatbot's answer matches your manual 'Ground Truth' answer."""
-    grader = llm.with_structured_output(CorrectnessGrade)
+def ragas_context_recall_evaluator(inputs: dict, outputs: dict, reference_outputs: dict) -> dict:
+    question = inputs["question"]
+    answer = outputs["messages"][-1].content
+    contexts = [doc.page_content for doc in outputs["documents"]]
+    ground_truth = reference_outputs["answer"] 
     
-    prediction = outputs["messages"][-1].content
-    reference = reference_outputs["answer"]
+    # Create a SingleTurnSample with reference data
+    sample = SingleTurnSample(
+        user_input=question,
+        response=answer,
+        retrieved_contexts=contexts,
+        reference=ground_truth
+    )
     
-    prompt = f"QUESTION: {inputs['question']}\nREFERENCE: {reference}\nPREDICTION: {prediction}"
+    # Use single_turn_score instead of score_single
+    score = context_recall.single_turn_score(sample)
     
-    result = grader.invoke([
-        SystemMessage(content="Act as a strict professor grading an exam based on a reference key."),
-        HumanMessage(content=prompt)
-    ])
-    return result.correct
+    return {"key": "ragas_context_recall", "score": score}
 
 
 
+def ragas_answer_relevancy_evaluator(inputs: dict, outputs: dict, reference_outputs: dict | None = None) -> dict:
+    question = inputs["question"]
+    answer = outputs["messages"][-1].content
+    contexts = [doc.page_content for doc in outputs["documents"]]
+    
+    # Create a SingleTurnSample object
+    sample = SingleTurnSample(
+        user_input=question,
+        response=answer,
+        retrieved_contexts=contexts
+    )
+    
+    score = answer_relevancy.single_turn_score(sample)
+    
+    return {"key": "ragas_answer_relevancy", "score": score}
+def ragas_context_precision_evaluator(inputs: dict, outputs: dict, reference_outputs: dict) -> dict:
+    question = inputs["question"]
+    answer = outputs["messages"][-1].content
+    contexts = [doc.page_content for doc in outputs["documents"]]
+    ground_truth = reference_outputs["answer"] 
+    
+    # Precision relies heavily on the 'reference' (Ground Truth) to check if ranked correctly
+    sample = SingleTurnSample(
+        user_input=question,
+        response=answer,
+        retrieved_contexts=contexts,
+        reference=ground_truth
+    )
+    
+    score = context_precision.single_turn_score(sample)
+    
+    return {"key": "ragas_context_precision", "score": score}
+def ragas_answer_correctness_evaluator(inputs: dict, outputs: dict, reference_outputs: dict) -> dict:
+    question = inputs["question"]
+    answer = outputs["messages"][-1].content
+    contexts = [doc.page_content for doc in outputs["documents"]]
+    ground_truth = reference_outputs["answer"] 
+    
+    # Answer correctness compares the response to the reference
+    sample = SingleTurnSample(
+        user_input=question,
+        response=answer,
+        retrieved_contexts=contexts,
+        reference=ground_truth
+    )
+    
+    score = answer_correctness.single_turn_score(sample)
+    
+    return {"key": "ragas_answer_correctness", "score": score}
