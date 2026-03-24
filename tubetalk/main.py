@@ -1,14 +1,14 @@
 import os
 from langchain_core.messages import HumanMessage
 from langsmith import traceable
-from retriever import create_retriever_from_url
+from simple_retriever import create_retriever_from_url
 from chatbot import ChatbotService
 from dotenv import load_dotenv
 load_dotenv()
 
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_PROJECT"] = "tubetalk-ai"
-RAG_VERSION = "gemini-embeddings"
+RAG_VERSION = "cosine-retriever(g-embed)-hindi-query"
 
 def main():
     # ── Config ──────────────────────────────────────────────────
@@ -17,7 +17,7 @@ def main():
     THREAD_ID = "genai"
 
     # ── Step 1 : Build Hybrid Retriever ─────────────────────────
-    retriever = create_retriever_from_url(YOUTUBE_URL, doc_language="english",thread_id=THREAD_ID)
+    retriever = create_retriever_from_url(YOUTUBE_URL, doc_language="hindi",thread_id=THREAD_ID)
     if retriever is None:
         print(" Could not build retriever. Exiting.")
         return

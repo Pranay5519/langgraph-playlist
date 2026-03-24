@@ -1,62 +1,70 @@
 import os
 import uuid
+from langsmith import Client
+from langsmith.evaluation import evaluate
+from langchain_core.messages import HumanMessage, SystemMessage
 from dotenv import load_dotenv
-from langsmith import Client, traceable
-from langchain_core.tracers import LangChainTracer
-from langchain_core.messages import HumanMessage
-
-# Custom imports
+from langsmith import traceable
+# Import your custom modules
 from retriever import create_retriever_from_url
 from chatbot import ChatbotService
-from eval_metrics import run_ragas_evaluation  # <--- Our new module
+from eval_metrics import correctness
 
 load_dotenv()
-os.environ["LANGCHAIN_PROJECT"] = "TubeTalk-Ragas-Production"
-
-# --- CONFIG ---
+os.environ["LANGCHAIN_PROJECT"] = "TubeTalk-Production-Eval"
+# ── CONFIG ──────────────────────────────────────────────────
+# Ensure these match your LangSmith setup
 YOUTUBE_URL = "https://youtu.be/WzvURhaDZqI" 
 DATASET_NAME = "TubeTalk.ai EVAL"
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
 THREAD_ID = "genai"
 
-# Initialize Services
-retriever_result = create_retriever_from_url(YOUTUBE_URL, doc_language="hindi", thread_id=THREAD_ID)
-retriever_obj = retriever_result[0] if isinstance(retriever_result, tuple) else retriever_result
-service = ChatbotService(api_key=os.getenv("GOOGLE_API_KEY"))
+retriever_result = create_retriever_from_url(YOUTUBE_URL, doc_language="hindi" , thread_id=THREAD_ID)
+if isinstance(retriever_result, tuple):
+    retriever_obj = retriever_result[0]
+else:
+    retriever_obj = retriever_result
+
+# Initialize the chatbot service
+service = ChatbotService(api_key=GOOGLE_API_KEY)
 app = service.build_chatbot(retriever_obj)
 
+# ── TARGET FUNCTION ──────────────────────────────────────────
 @traceable(name="TT-Eval-TargetFunc")
 def predict_chatbot(inputs: dict):
-    # Standard Chatbot execution
+    user_q = inputs["question"]
+    
+    # Generate a unique thread ID for a clean state
     config = {"configurable": {"thread_id": THREAD_ID}}
-    result = app.invoke({"messages": [HumanMessage(content=inputs["question"])]}, config=config)
+
+    # Invoke the graph to get the answer
+    result = app.invoke(
+        {"messages": [HumanMessage(content=user_q)]},
+        config=config
+    )
     
+    # Only return the messages; ignoring 'documents' for now
     return {
-        "answer": result["messages"][-1].content,
-        "contexts": [doc.page_content for doc in result.get("documents", [])]
+        "messages": result["messages"]
     }
-
+# ── RUN EVALUATION ───────────────────────────────────────────
 if __name__ == "__main__":
-    client = Client()
-    examples = list(client.list_examples(dataset_name=DATASET_NAME))
+    print(f"Starting evaluation on dataset: {DATASET_NAME}")
     
-    results_for_ragas = []
-    print(f"🚀 Running evaluation on {len(examples)} test cases...")
-
-    for ex in examples:
-        # 1. Run the Chatbot
-        outputs = predict_chatbot(ex.inputs)
-        
-        # 2. Collect for the Metrics Engine
-        results_for_ragas.append({
-            "question": ex.inputs["question"],
-            "answer": outputs["answer"],
-            "contexts": outputs["contexts"],
-            "ground_truth": ex.outputs["answer"]
-        })
-
-    # 3. Call the external metrics file
-    tracer = LangChainTracer(project_name="TubeTalk-Ragas-Run")
-    final_scores = run_ragas_evaluation(results_for_ragas, callbacks=[tracer])
-
-    print("\n✅ Ragas Evaluation Complete!")
-    print(final_scores)
+    try:
+        results = evaluate(
+            predict_chatbot,
+            data=DATASET_NAME,
+            evaluators=[correctness],
+            experiment_prefix="eval-gem-2.5-flash",
+            metadata={
+        "model": "ollama-qwen3:latest",
+        "retriever": "hybrid-ensemble",
+        "language": "hindi",
+        "evaluator" : "ollama-qwen3:latest"
+    }
+        )
+        print("Evaluation complete! View results in LangSmith.")
+    except Exception as e:
+        print(f"Evaluation failed: {e}")
