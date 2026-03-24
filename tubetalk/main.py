@@ -8,13 +8,13 @@ load_dotenv()
 
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_PROJECT"] = "tubetalk-ai"
-RAG_VERSION = "multilingual"
+RAG_VERSION = "gemini-embeddings"
 
 def main():
     # ── Config ──────────────────────────────────────────────────
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-    YOUTUBE_URL = "https://youtu.be/ba-HMvDn_vU"
-    THREAD_ID = "MIT-test"
+    YOUTUBE_URL = "https://youtu.be/WzvURhaDZqI"
+    THREAD_ID = "genai"
 
     # ── Step 1 : Build Hybrid Retriever ─────────────────────────
     retriever = create_retriever_from_url(YOUTUBE_URL, doc_language="english",thread_id=THREAD_ID)
@@ -34,7 +34,7 @@ def main():
     }
     
     # ── Step 3 : Single Execution ───────────────────────────────
-    user_input = "What specific behavioral evidence did the speaker use to distinguish between the patient's impairment in navigating environments versus reproducing multi-part objects?"
+    user_input = "How many Layers are present in this Architecture (genai)"
     
     print(f"\n🚀 Sending Query: {user_input}\n")
 

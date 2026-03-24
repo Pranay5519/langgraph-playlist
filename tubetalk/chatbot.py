@@ -41,7 +41,6 @@ class AnsandTime(BaseModel):
         description="Any code snippets mentioned in the transcript. Leave null if no code is present."
     )
 
-
 # ──────────────────────────────────────────────
 # Chat State
 # ──────────────────────────────────────────────
@@ -49,7 +48,6 @@ class AnsandTime(BaseModel):
 class ChatState(TypedDict):
     # add_messages appends each turn instead of overwriting
     messages: Annotated[list[BaseMessage], add_messages]
-
 
 # ──────────────────────────────────────────────
 # Chatbot Service
@@ -64,15 +62,15 @@ class ChatbotService:
     def __init__(
         self,
         api_key: str,
-        model_name: str = "qwen3:latest",
+        model_name: str = "gemini-2.5-flash",
         temperature: float = 0,
         db_path: str = "tubetalk.db",
     ):
         # ── LLM ────────────────────────────────────────────────
-        self.llm = ChatOllama(
+        self.llm = ChatGoogleGenerativeAI(
             model=model_name,
-            temperature=temperature
-            #api_key=api_key,
+            temperature=temperature,
+            api_key=api_key,
         )
         self.structured_model = self.llm.with_structured_output(AnsandTime)
 

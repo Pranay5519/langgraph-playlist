@@ -65,37 +65,36 @@ def build_hybrid_retriever(chunks,thread_id, *, faiss_k: int = 4, bm25_k: int = 
     top_n   : final docs returned after merge
     """
     # define Structured LLMS
-    llm = ChatOllama(model="qwen3:latest")
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
     bm25_structured_llm = llm.with_structured_output(SingleQueryOutput)
     
     # ── Dense retriever (FAISS) ──────────────────────────────
-    embeddings = HuggingFaceEmbeddings(
-                    model_name="intfloat/multilingual-e5-base",
-                    model_kwargs={"device": "cpu"}
-                )
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="gemini-embedding-2-preview", 
+        google_api_key=os.getenv("GOOGLE_API_KEY")
+    )
 
+    # 2. Path Setup
     base_dir = os.path.join("tubetalk", "faiss_indexes")
-    
-    # 2. Automatically create the folders if they are missing
     os.makedirs(base_dir, exist_ok=True)
 
     # 3. Set the final path for this specific video
+    # Note: Use video_id or thread_id to keep the index unique
     index_path = os.path.join(base_dir, f"faiss_index_{thread_id}")
 
     if os.path.exists(index_path):
-        print(f"Loading existing FAISS index from: {index_path}")
+        print(f"📁 Loading existing FAISS index from: {index_path}")
         vector_store = FAISS.load_local(
             index_path, 
             embeddings, 
-            allow_dangerous_deserialization=True # Necessary for local loading
+            allow_dangerous_deserialization=True 
         )
     else:
-        print("🧠 Creating new embeddings and FAISS index...")
+        print("🧠 Requesting Gemini to create new embeddings...")
         vector_store = FAISS.from_documents(chunks, embeddings)
         vector_store.save_local(index_path)
         print(f"💾 FAISS index saved to: {index_path}")
-    
     QUERY_PROMPT = PromptTemplate(
     input_variables=["question", "language"], 
     template="""You are an AI language model assistant. 
@@ -115,7 +114,7 @@ def build_hybrid_retriever(chunks,thread_id, *, faiss_k: int = 4, bm25_k: int = 
     custom_prompt = QUERY_PROMPT.partial(language = doc_language)
     multiquery_retriever = MultiQueryRetriever.from_llm(
                         retriever=vector_store.as_retriever(search_kwargs={"k": 1}),
-                        llm=ChatOllama(model="qwen3:latest"),
+                        llm=ChatGoogleGenerativeAI(model="gemini-2.5-flash"),
                         prompt=custom_prompt ,
                         parser_key="lines"  # ensures that any accidental whitespace or empty lines are cleaned up before the search
                     )
