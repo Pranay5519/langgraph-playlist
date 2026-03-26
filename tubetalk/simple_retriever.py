@@ -38,9 +38,11 @@ def text_splitter(transcript: str):
 # ──────────────────────────────────────────────
 # 3. Build Simple Cosine Similarity Retriever
 # ──────────────────────────────────────────────
-def build_retriever(chunks, thread_id, *, top_n: int = 5, doc_language: str = "English"):
+EMBEDDING_MODEL = "gemini-embedding-001"
+
+def build_retriever(chunks, thread_id, *, top_n: int = 3, doc_language: str = "English"):
     embeddings = GoogleGenerativeAIEmbeddings(
-        model="gemini-embedding-2-preview", 
+        model=EMBEDDING_MODEL,
         google_api_key=os.getenv("GOOGLE_API_KEY")
     )
     
@@ -50,15 +52,22 @@ def build_retriever(chunks, thread_id, *, top_n: int = 5, doc_language: str = "E
     os.makedirs(base_dir, exist_ok=True)
     index_path = os.path.join(base_dir, f"faiss_index_{thread_id}")
 
-    if os.path.exists(index_path):
-        vector_store = FAISS.load_local(
-            index_path, embeddings, allow_dangerous_deserialization=True 
-        )
-    else:
-        vector_store = FAISS.from_documents(chunks, embeddings)
-        vector_store.save_local(index_path)
+    def build_vector_store(docs):
+        if os.path.exists(index_path):
+            print(f"📁 Loading existing FAISS index from: {index_path}")
+            return FAISS.load_local(
+                index_path, embeddings, allow_dangerous_deserialization=True
+            ), "loaded_from_cache"
+        else:
+            print("🧠 Requesting Gemini to create new embeddings...")
+            vs = FAISS.from_documents(docs, embeddings)
+            vs.save_local(index_path)
+            print(f"💾 FAISS index saved to: {index_path}")
+            return vs, "newly_created"
 
-    @traceable(name="Translated_Cosine_Retriever")
+    vector_store, _ = build_vector_store(chunks)
+
+    @traceable(name="Translated_Cosine_Retriever", metadata={"embedding_model": EMBEDDING_MODEL, "index_path": index_path})
     def retrieve(query: str):
         search_query = query
         

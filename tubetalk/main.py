@@ -8,16 +8,16 @@ load_dotenv()
 
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_PROJECT"] = "tubetalk-ai"
-RAG_VERSION = "cosine-retriever(g-embed)-hindi-query"
+RAG_VERSION = "SR-txt-em-001"
 
 def main():
     # ── Config ──────────────────────────────────────────────────
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
     YOUTUBE_URL = "https://youtu.be/WzvURhaDZqI"
-    THREAD_ID = "genai"
+    THREAD_ID = "genai_mul_em_002"
 
     # ── Step 1 : Build Hybrid Retriever ─────────────────────────
-    retriever = create_retriever_from_url(YOUTUBE_URL, doc_language="hindi",thread_id=THREAD_ID)
+    retriever = create_retriever_from_url(YOUTUBE_URL, doc_language="english",thread_id=THREAD_ID)
     if retriever is None:
         print(" Could not build retriever. Exiting.")
         return
