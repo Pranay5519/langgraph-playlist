@@ -1,14 +1,14 @@
 import os
 from langchain_core.messages import HumanMessage
 from langsmith import traceable
-from simple_retriever import create_retriever_from_url
+from crag import create_retriever_from_url
 from chatbot import ChatbotService
 from dotenv import load_dotenv
 load_dotenv()
 
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_PROJECT"] = "tubetalk-ai"
-RAG_VERSION = "SR-txt-em-001"
+RAG_VERSION = "crag"
 
 def main():
     # ── Config ──────────────────────────────────────────────────
