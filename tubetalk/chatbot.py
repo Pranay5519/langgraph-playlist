@@ -7,16 +7,17 @@ Only the retriever wiring changes from your original code.
 """
 
 import sqlite3
-from typing import TypedDict, Annotated
+from typing import TypedDict, Annotated, List, Optional
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langsmith import traceable
-from pydantic import BaseModel , Field
-from typing import List, Optional
+from pydantic import BaseModel, Field
 from langchain_ollama import ChatOllama
 
 # ──────────────────────────────────────────────
@@ -84,26 +85,73 @@ class ChatbotService:
         )
     )
 
+        # ── Query contextualization prompt ──────────────────────
+        # Rewrites follow-up questions into standalone questions
+        # so FAISS always gets a complete, self-contained query.
+        self.contextualize_prompt = ChatPromptTemplate.from_messages([
+            ("system",
+             "Given the chat history and a follow-up question, "
+             "rewrite the follow-up into a single standalone question "
+             "that contains all the context needed to search a document. "
+             "If the question is already standalone, return it unchanged. "
+             "Output ONLY the rewritten question, nothing else."),
+            ("placeholder", "{history}"),
+            ("human", "{question}"),
+        ])
+        self.contextualize_chain = self.contextualize_prompt | self.llm | StrOutputParser()
+
         # ── Persistent memory (SQLite) ──────────────────────────
         conn = sqlite3.connect(db_path, check_same_thread=False)
         self.checkpointer = SqliteSaver(conn=conn)
+
+    # ── Query contextualizer ─────────────────────────────────────
+    @traceable(name="contextualize Query")
+    def _contextualize_query(self, state: ChatState) -> str:
+        """
+        If there is prior chat history, rewrite the latest follow-up
+        question into a fully self-contained standalone question.
+        This ensures FAISS retrieves the right chunks even for vague
+        follow-ups like 'what are those layers?'.
+        """
+        messages = state["messages"]
+        user_question = messages[-1].content
+
+        # Only contextualize if there IS prior history (not the first question)
+        history = messages[:-1]   # everything except the latest question
+        if not history:
+            return user_question  # first question — already standalone
+
+        try:
+            standalone = self.contextualize_chain.invoke({
+                "history": history,
+                "question": user_question,
+            }).strip()
+            if standalone:
+                print(f"🔄 Contextualized query: {standalone}")
+                return standalone
+        except Exception as e:
+            print(f"⚠️ Contextualization failed: {e}. Using original query.")
+
+        return user_question
 
     # ── Graph node ──────────────────────────────────────────────
     @traceable(name="Chat Node")
     def _chat_node(self, state: ChatState, retriever):
         """
         Single graph node:
-          1. Extract last user question from state
-          2. Retrieve relevant chunks via Hybrid Retriever
+          1. Contextualize follow-up question using chat history
+          2. Retrieve relevant chunks using standalone query
           3. Build prompt = system + context + full history
           4. Call structured LLM
           5. Return AI message
         """
         user_question = state["messages"][-1].content
 
-        # Hybrid retrieval  ← only change from original
-        retrieved_chunks = retriever(user_question)
-        #print(retrieved_chunks)
+        # ── Step 1: Rewrite follow-up into standalone query ──────
+        search_query = self._contextualize_query(state)
+
+        # ── Step 2: Retrieval using context-aware query ──────────
+        retrieved_chunks = retriever(search_query)
         context = "\n\n".join(doc.page_content for doc in retrieved_chunks)
 
         messages = (

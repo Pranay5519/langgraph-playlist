@@ -1,37 +1,44 @@
+import random
 from langsmith import Client
 from dotenv import load_dotenv
+
 load_dotenv()
 client = Client()
 
-# Define dataset: these are your test cases
-dataset_name = "TubeTalk.ai EVAL"
+dataset_name = "TubeTalk.ai EVAL 2"
 dataset = client.create_dataset(dataset_name)
+
+# 1. Your fixed question with all layers joined into a single sentence string
+fixed_example = {
+    "inputs": {"question": "How many layers are present in this architecture and what are they?"},
+    "outputs": {
+        "answer": "Based on the 'Map of Generative AI' presented in the video, there are 8 layers that organize the entire AI world: Research Layer (0:15:24) which is the birthplace of core AI innovations, Foundation Layer (0:35:57) where research ideas are converted into large-scale AI models, Platform Layer (0:51:45) providing scalable access via APIs, Builder Layer (1:12:09) where models and logic are combined into workflows, Application Layer (1:30:02) being the final software product, Operation Layer (1:41:23) handling deployment and reliability, Distribution Layer (2:03:20) focusing on business and marketing, and the User Layer (2:11:03) for the end-users."
+    },
+}
+
+# 2. The pool for the random second question
+pool = [
+    {
+        "inputs": {"question": "What is the main goal of the Research Layer in the GenAI Map?"},
+        "outputs": {"answer": "The Research Layer is where core AI innovation is born, focusing on developing new model architectures and learning algorithms (0:15:24)."},
+    },
+
+    {
+        "inputs": {"question": "why is the Builder Layer considered crucial for bridging raw model intelligence from the Platform Layer with the practical functionality needed in the Application Layer, and what role does Context Engineering play in this process?"},
+        "outputs": {"answer": "The Builder Layer takes raw model intelligence and shapes it for specific use cases. It converts LLMs from simple 'next-token predictors' into actionable systems by utilizing tools like RAG and frameworks like LangChain to create functional products. Context Engineering is critical here because it allows developers to manage what information is sent to the model in real-time, switching contexts between different tools (like GitHub or Slack) to enhance the model's capability to execute complex tasks."},
+    }
+]
+
+# Pick one at random
+random_second_example = random.choice(pool)
+
+# Combine and upload
+final_examples = [fixed_example, random_second_example]
+
 client.create_examples(
     dataset_id=dataset.id,
-examples = [
-{
-"inputs": {"question": "What is the main goal of the Research Layer in the GenAI Map?"},
-"outputs": {"answer": "The Research Layer is where core AI innovation is born, focusing on developing new model architectures (like Transformers or Diffusion models) and learning algorithms (0:15:24)."},
-},
-{
-"inputs": {"question": "How are ideas from the Research Layer converted into working models?"},
-"outputs": {"answer": "In the Foundation Layer, research ideas are implemented into code and trained on massive datasets using huge compute resources to create large-scale foundation models (0:35:57)."},
-},
-{
-"inputs": {"question": "how many layers are present in this GenAi archtiecture"},
-"outputs": {"answer": "Generative AI architecture is organized into 8 distinct layers"}
-},
-{
-"inputs": {"question": "What is the specific purpose of 'Context Engineering' within the Builder Layer, and how does it differ from prompt engineering?"},
-"outputs": {"answer": "Context Engineering involves managing the external data and information passed to the model in real-time, such as switching between GitHub codebases, Jira tickets, or Slack discussions depending on the task, to ensure the model has the correct information (1:24:15)."}
-},
-{
-"inputs": {"question": "According to the map, what is the role of the Operations Layer in ensuring AI application reliability?"},
-"outputs": {"answer": "The Operations Layer focuses on deploying and running the software reliably. This includes packaging the application (e.g., Docker), setting up infrastructure (e.g., Kubernetes), implementing deployment strategies like canary or blue-green, managing versions, and handling scaling and load management (1:41:23)."}
-},
-{
-"inputs": {"question": "Explain the feedback loop mechanism described between the User Layer and the Research Layer."},
-"outputs": {"answer": "Users provide feedback on AI products (e.g., citing hallucinations). This feedback goes to the Builder Layer, then to the Platform Layer to analyze API metrics, and finally back to the Foundation or Research Layers to improve model alignment, factual accuracy, or core architecture (2:20:19)."}
-}
- ]
+    inputs=[e["inputs"] for e in final_examples],
+    outputs=[e["outputs"] for e in final_examples]
 )
+
+print(f"Dataset '{dataset_name}' created with 2 examples.")

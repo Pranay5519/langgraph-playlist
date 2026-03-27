@@ -6,7 +6,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from dotenv import load_dotenv
 from langsmith import traceable
 # Import your custom modules
-from hybrid_retriever import create_retriever_from_url
+from simple_retriever import create_retriever_from_url
 from eval_metrics import ragas_faithfulness_evaluator, ragas_context_recall_evaluator
 from chatbot import ChatbotService
 load_dotenv()
@@ -14,10 +14,11 @@ os.environ["LANGCHAIN_PROJECT"] = "TubeTalk-Production-Eval"
 # ── CONFIG ──────────────────────────────────────────────────
 # Ensure these match your LangSmith setup
 YOUTUBE_URL = "https://youtu.be/WzvURhaDZqI" 
-DATASET_NAME = "TubeTalk.ai EVAL"
+DATASET_NAME = "TubeTalk.ai EVAL 2"
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-THREAD_ID = "genai"
+EXPERIMENT_PREFIX = "simple-retriever"
+THREAD_ID = "genai_mul_em_002"
 
 retriever_result = create_retriever_from_url(YOUTUBE_URL, doc_language="english" , thread_id=THREAD_ID)
 if isinstance(retriever_result, tuple):
@@ -61,11 +62,11 @@ if __name__ == "__main__":
             predict_chatbot,
             data=DATASET_NAME,
             evaluators=[ragas_faithfulness_evaluator, ragas_context_recall_evaluator],
-            experiment_prefix="hybrid-retriever",
+            experiment_prefix=EXPERIMENT_PREFIX,
             metadata={
         "model": "gemini-2.5-flash",
-        "retriever": "hybrid",           
-        "language": "hindi",
+        "retriever": EXPERIMENT_PREFIX,           
+        "language": "english",
         "evaluator" : "gemini-2.5-flash"
     }
         )

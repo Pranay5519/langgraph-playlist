@@ -1,14 +1,14 @@
 import os
 from langchain_core.messages import HumanMessage
 from langsmith import traceable
-from crag import create_retriever_from_url
+from simple_retriever import create_retriever_from_url
 from chatbot import ChatbotService
 from dotenv import load_dotenv
 load_dotenv()
 
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_PROJECT"] = "tubetalk-ai"
-RAG_VERSION = "crag"
+RAG_VERSION = "cross-simple_retriever"
 
 def main():
     # ── Config ──────────────────────────────────────────────────
@@ -34,7 +34,7 @@ def main():
     }
     
     # ── Step 3 : Single Execution ───────────────────────────────
-    user_input = "How many Layers are present in this Architecture (genai)"
+    user_input = "How many layers are present in this architecture and what are they?"
     
     print(f"\n🚀 Sending Query: {user_input}\n")
 
